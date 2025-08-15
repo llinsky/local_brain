@@ -98,6 +98,11 @@ def speak_or_cached(text: str, cache_filename: str = None):
 
 def cleanup_audio():
     """Gracefully clean up audio resources."""
+    global _audio_cleaned_up
+    
+    if _audio_cleaned_up:
+        return  # Already cleaned up
+    
     try:
         # Stop any active SoundDevice playback
         sd.stop()
@@ -105,9 +110,11 @@ def cleanup_audio():
         # Small delay to ensure SoundDevice cleanup completes
         time.sleep(0.1)
         
+        _audio_cleaned_up = True
         print("Audio cleanup completed")
     except Exception as e:
         print(f"Audio cleanup warning: {e}")
+        _audio_cleaned_up = True  # Mark as cleaned up even if there was an error
 
 def clean_text_for_speech(text: str) -> str:
     """Clean text for better TTS pronunciation by removing markdown formatting."""
@@ -140,8 +147,9 @@ def clean_text_for_speech(text: str) -> str:
     
     return text.strip()
 
-# Global flag to track when TTS is playing
+# Global flags for audio state
 _is_speaking = False
+_audio_cleaned_up = False
 
 def is_speaking():
     """Check if TTS is currently playing."""
@@ -170,6 +178,7 @@ def speak(text: str):
         _is_speaking = False
 
 def record_command(pa, chunk_size, silence_threshold=SILENCE_THRESHOLD, silence_duration=SILENCE_DURATION):
+    # Always create a dedicated stream for command recording
     stream = pa.open(
         rate=SAMPLE_RATE,
         channels=1,
@@ -205,8 +214,13 @@ def record_command(pa, chunk_size, silence_threshold=SILENCE_THRESHOLD, silence_
                     print("Silence detected, stopping recording.")
                     break
     finally:
-        stream.stop_stream()
-        stream.close()
+        # Always close the stream we created
+        try:
+            stream.stop_stream()
+            stream.close()
+        except OSError:
+            # Ignore PortAudio cleanup errors
+            pass
     # Wrap into WAV buffer
     wav_buffer = io.BytesIO()
     with wave.open(wav_buffer, 'wb') as wf:

@@ -30,6 +30,7 @@ A comprehensive voice-activated AI assistant that integrates multiple LLMs, tool
 - **System tools**: grep, find, head, tail, cat with safety controls
 - **Python execution**: Isolated environment for code execution
 - **Package management**: Install Python packages in test environment
+- **Multi-step workflows**: LLM can make follow-up requests for deeper exploration
 
 ### 🔧 Advanced Features
 - **MCP Server**: Expose tools to Claude via Model Context Protocol
@@ -86,12 +87,41 @@ response, conv_id = run_conversation("Tell me more about neural networks", conv_
 response, conv_id = run_conversation("Search Wikipedia for Python programming")
 ```
 
+## Multi-Step Workflow Patterns
+
+The system supports intelligent multi-step workflows where the LLM can:
+
+1. **Search then Explore**: Use search tools to get lists of results, then dive deep into specific items
+2. **Multiple Tool Chains**: Execute multiple tools in sequence during a single conversation turn
+3. **Context Building**: Build comprehensive responses by gathering information from multiple sources
+
+### Common Multi-Step Patterns
+
+**Wikipedia Research:**
+- `wikipedia_search("machine learning")` → Get list of related articles
+- `get_wikipedia_page("Deep learning")` → Get full content of specific article
+
+**Web Research:**
+- `web_search("climate change 2024")` → Get search results with URLs
+- `get_web_page("https://example.com/climate-report")` → Fetch full article content
+
+**File System Exploration:**
+- `list_directory("/project/src")` → See available files
+- `read_file("/project/src/main.py")` → Read specific file content
+
+**Conversation Analysis:**
+- `lookup_past_conversations("database optimization")` → Find relevant conversations
+- `load_full_conversation("conv_20240115_123")` → Load complete conversation history
+
 ## Available Tools
 
 ### Information & Search
 - `wikipedia_search(query)` - Search Wikipedia articles
-- `web_search(query)` - DuckDuckGo web search
+- `get_wikipedia_page(title)` - Get full content of specific Wikipedia page
+- `web_search(query)` - DuckDuckGo web search  
+- `get_web_page(url)` - Fetch content of specific web page from search results
 - `lookup_past_conversations(query)` - Search conversation history
+- `load_full_conversation(conversation_id)` - Load complete message history for specific conversation
 
 ### Multi-LLM Access
 - `call_gemini(prompt)` - Google Gemini 2.5 Pro
@@ -263,10 +293,13 @@ MIT License - see LICENSE file for details.
 ## Recent Improvements
 
 ### Enhanced Voice Control
+- **Conversation Sessions**: Wake word starts a conversation session that continues until ended
 - **Conversation Management**: Say "goodbye" or "stop" to end conversations  
 - **Program Control**: Say "shut down" to exit the application
 - **Wake Word Audio Feedback**: Distinct beep when wake word is detected
 - **Streamlined Messages**: Concise system responses ("Goodbye." vs "Goodbye! Say Hey GERT...")
+- **Fresh Conversations**: Each wake word activation starts a new conversation context
+- **Stable Wake Word Detection**: Model state reset prevents false trigger loops
 
 ### Improved Speech Detection
 - **Silence Detection Fix**: Fixed critical bug preventing proper silence detection

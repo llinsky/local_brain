@@ -65,14 +65,92 @@ def wikipedia_search(query: str):
     except Exception as e:
         return json.dumps({"error": str(e)})
 
-def web_search(query: str):
-    """Performs a web search for the given query and returns the top 5 results."""
+def get_wikipedia_page(title: str):
+    """Gets the full content of a specific Wikipedia page by title."""
+    try:
+        page = wikipedia.page(title)
+        return json.dumps({
+            "title": page.title,
+            "summary": page.summary,
+            "url": page.url,
+            "content": page.content[:5000]  # Limit content to first 5000 chars
+        })
+    except wikipedia.exceptions.PageError:
+        return json.dumps({"error": f"Wikipedia page '{title}' not found"})
+    except wikipedia.exceptions.DisambiguationError as e:
+        return json.dumps({"error": f"Page '{title}' is ambiguous. Options: {e.options[:5]}"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def load_full_conversation(conversation_id: str):
+    """Loads the complete message history for a specific conversation."""
+    try:
+        messages = load_conversation(conversation_id)
+        if not messages:
+            return json.dumps({"error": f"Conversation '{conversation_id}' not found"})
+        
+        # Format messages for easier reading
+        formatted_messages = []
+        for msg in messages:
+            if msg.get('role') == 'system':
+                continue  # Skip system messages
+            formatted_messages.append({
+                "role": msg.get('role', 'unknown'),
+                "content": msg.get('content', '')[:1000]  # Limit content length
+            })
+        
+        return json.dumps({
+            "conversation_id": conversation_id,
+            "message_count": len(formatted_messages),
+            "messages": formatted_messages
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def web_search(query: str, **kwargs):
+    """Performs a web search for the given query and returns the top 10 results."""
     try:
         with DDGS() as ddgs:
-            results = [r for r in ddgs.text(query, max_results=5)]
+            results = [r for r in ddgs.text(query, max_results=10)]
         return json.dumps(results)
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+def get_web_page(url: str):
+    """Fetches the content of a specific web page from a URL."""
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        # Parse HTML and extract text content
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.extract()
+        
+        # Get text content
+        text = soup.get_text()
+        
+        # Clean up text
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = ' '.join(chunk for chunk in chunks if chunk)
+        
+        return json.dumps({
+            "url": url,
+            "title": soup.title.string if soup.title else "No title",
+            "content": text[:3000]  # Limit to first 3000 chars
+        })
+    except Exception as e:
+        return json.dumps({"error": f"Failed to fetch {url}: {str(e)}"})
 
 def call_grok(prompt: str):
     """Calls the Grok API with the given prompt and returns the response."""
@@ -344,8 +422,42 @@ tools = [
     {
         "type": "function",
         "function": {
+            "name": "get_wikipedia_page",
+            "description": "Gets the full content of a specific Wikipedia page by title.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "The exact title of the Wikipedia page to retrieve",
+                    },
+                },
+                "required": ["title"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "load_full_conversation",
+            "description": "Loads the complete message history for a specific conversation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "description": "The ID of the conversation to load",
+                    },
+                },
+                "required": ["conversation_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "web_search",
-            "description": "Performs a web search for the given query and returns the top 5 results.",
+            "description": "Performs a web search for the given query and returns the top 10 results.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -355,6 +467,23 @@ tools = [
                     },
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_web_page",
+            "description": "Fetches the content of a specific web page from a URL.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL of the web page to fetch",
+                    },
+                },
+                "required": ["url"],
             },
         },
     },
@@ -680,95 +809,120 @@ def run_conversation(prompt: str, conversation_id: str = None):
     
     messages.append(message_dict)
 
-    # Check if the model wants to call a tool
+    # Check if the model wants to call tools
     if hasattr(response.message, 'tool_calls') and response.message.tool_calls:
-        tool_call = response.message.tool_calls[0]
-        function_name = tool_call.function.name
-        function_args = tool_call.function.arguments
+        # Handle multiple tool calls in sequence
+        tool_results = []
         
-        logger.info(f"Executing tool: {function_name} with args: {function_args}")
+        for tool_call in response.message.tool_calls:
+            function_name = tool_call.function.name
+            function_args = tool_call.function.arguments
+            
+            logger.info(f"Executing tool: {function_name} with args: {function_args}")
 
-        # 5. Execute the tool
-        if function_name == "wikipedia_search":
-            with Timeout(30):
-                result = wikipedia_search(**function_args)
-        elif function_name == "web_search":
-            with Timeout(30):
-                result = web_search(**function_args)
-        elif function_name == "call_grok":
-            with Timeout(600):
-                result = call_grok(**function_args)
-        elif function_name == "call_openai":
-            with Timeout(600):
-                result = call_openai(**function_args)
-        elif function_name == "call_gemini":
-            with Timeout(600):
-                result = call_gemini(**function_args)
-        elif function_name == "call_claude":
-            with Timeout(600):
-                result = call_claude(**function_args)
-        elif function_name == "call_consensus_query":
-            with Timeout(900):
-                result = call_consensus_query(**function_args)
-        elif function_name == "call_superconsensus":
-            with Timeout(1800):  # 30 minutes for superconsensus
-                result = call_superconsensus(**function_args)
-        elif function_name == "lookup_past_conversations":
-            with Timeout(30):
-                result = lookup_past_conversations(**function_args)
-        # File operations
-        elif function_name == "read_file":
-            with Timeout(30):
-                result = read_file(**function_args)
-        elif function_name == "write_file":
-            with Timeout(30):
-                result = write_file(**function_args)
-        elif function_name == "list_directory":
-            with Timeout(30):
-                result = list_directory(**function_args)
-        # System tools
-        elif function_name == "grep_files":
-            with Timeout(60):
-                result = grep_files(**function_args)
-        elif function_name == "find_files":
-            with Timeout(60):
-                result = find_files(**function_args)
-        elif function_name == "head_file":
-            with Timeout(30):
-                result = head_file(**function_args)
-        # Python execution
-        elif function_name == "execute_python_code":
-            with Timeout(60):
-                result = execute_python_code(**function_args)
-        # Conversation management
-        elif function_name == "clear_conversation_history":
-            with Timeout(30):
-                result = clear_conversation_history()
-        elif function_name == "list_conversations":
-            with Timeout(30):
-                result = list_conversations()
-        else:
-            result = "Unknown function"
+            # Execute the tool
+            if function_name == "wikipedia_search":
+                with Timeout(30):
+                    result = wikipedia_search(**function_args)
+            elif function_name == "get_wikipedia_page":
+                with Timeout(30):
+                    result = get_wikipedia_page(**function_args)
+            elif function_name == "load_full_conversation":
+                with Timeout(30):
+                    result = load_full_conversation(**function_args)
+            elif function_name == "web_search":
+                with Timeout(30):
+                    result = web_search(**function_args)
+            elif function_name == "get_web_page":
+                with Timeout(30):
+                    result = get_web_page(**function_args)
+            elif function_name == "call_grok":
+                with Timeout(600):
+                    result = call_grok(**function_args)
+            elif function_name == "call_openai":
+                with Timeout(600):
+                    result = call_openai(**function_args)
+            elif function_name == "call_gemini":
+                with Timeout(600):
+                    result = call_gemini(**function_args)
+            elif function_name == "call_claude":
+                with Timeout(600):
+                    result = call_claude(**function_args)
+            elif function_name == "call_consensus_query":
+                with Timeout(900):
+                    result = call_consensus_query(**function_args)
+            elif function_name == "call_superconsensus":
+                with Timeout(1800):  # 30 minutes for superconsensus
+                    result = call_superconsensus(**function_args)
+            elif function_name == "lookup_past_conversations":
+                with Timeout(30):
+                    result = lookup_past_conversations(**function_args)
+            # File operations
+            elif function_name == "read_file":
+                with Timeout(30):
+                    result = read_file(**function_args)
+            elif function_name == "write_file":
+                with Timeout(30):
+                    result = write_file(**function_args)
+            elif function_name == "list_directory":
+                with Timeout(30):
+                    result = list_directory(**function_args)
+            # System tools
+            elif function_name == "grep_files":
+                with Timeout(60):
+                    result = grep_files(**function_args)
+            elif function_name == "find_files":
+                with Timeout(60):
+                    result = find_files(**function_args)
+            elif function_name == "head_file":
+                with Timeout(30):
+                    result = head_file(**function_args)
+            # Python execution
+            elif function_name == "execute_python_code":
+                with Timeout(60):
+                    result = execute_python_code(**function_args)
+            # Conversation management
+            elif function_name == "clear_conversation_history":
+                with Timeout(30):
+                    result = clear_conversation_history()
+            elif function_name == "list_conversations":
+                with Timeout(30):
+                    result = list_conversations()
+            else:
+                result = "Unknown function"
+            
+            # Store result for this tool call
+            tool_results.append({
+                "function": function_name,
+                "result": result
+            })
 
-        # 6. Return the result to the model using a simple approach that works
-        # Create a follow-up prompt that includes the tool result
-        followup_prompt = f"Based on the {function_name} result: {result}\n\nPlease provide a helpful response to the user's original question."
+        # Combine all tool results for the follow-up prompt
+        combined_results = "\n\n".join([f"{tr['function']}: {tr['result']}" for tr in tool_results])
+        followup_prompt = f"Based on the tool results:\n{combined_results}\n\nPlease provide a helpful response to the user's original question."
         
         # Add the tool execution info to conversation history
+        tool_call_summary = ", ".join([tr['function'] for tr in tool_results])
+        
+        # Convert tool calls to JSON-serializable format
+        serializable_tool_calls = []
+        for tc in response.message.tool_calls:
+            serializable_tool_calls.append({
+                'function': {
+                    'name': tc.function.name,
+                    'arguments': tc.function.arguments
+                }
+            })
+        
         messages.append({
             'role': 'assistant',
-            'content': f"I'll search for that information using {function_name}.",
-            'tool_calls': [{
-                'function': {
-                    'name': function_name,
-                    'arguments': function_args
-                }
-            }]
+            'content': f"I'll gather information using {tool_call_summary}.",
+            'tool_calls': serializable_tool_calls
         })
         
         messages.append({
             'role': 'tool',
-            'content': result
+            'content': combined_results
         })
         
         # Make a simple call with the follow-up prompt
