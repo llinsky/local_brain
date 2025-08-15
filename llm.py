@@ -30,6 +30,29 @@ def get_ollama_client():
         _ollama_client = ollama.Client()
     return _ollama_client
 
+def notify_human(message: str = "User input required"):
+    """Play a notification sound and speak a message when user input is needed."""
+    try:
+        from speech import play_notification_beep, speak_or_cached, speak
+        import os
+        
+        # Play a distinctive notification sound (higher pitch, longer duration)
+        play_notification_beep(1200, 0.3)
+        
+        # Speak the notification message using cached audio if available
+        cache_filename = "user_input_required.wav" if message == "User input required" else None
+        if cache_filename and os.path.exists(os.path.join("audio_cache", cache_filename)):
+            speak_or_cached(message, cache_filename)
+        else:
+            speak(message)
+            
+        logger.info(f"Human notification played: {message}")
+        
+    except Exception as e:
+        # Fallback: at least log the message if audio fails
+        logger.warning(f"Could not play audio notification '{message}': {e}")
+        print(f"🔔 NOTIFICATION: {message}")  # Console fallback
+
 # Define tools (functions)
 def wikipedia_search(query: str):
     """Searches Wikipedia for a query. Returns the summary of the exact matching page if it exists, otherwise a list of the top 5 search results."""
@@ -120,7 +143,7 @@ def call_claude(prompt: str):
         system_prompt = get_full_prompt("claude")
         
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1024,
             system=system_prompt,
             messages=[{"role": "user", "content": prompt}]

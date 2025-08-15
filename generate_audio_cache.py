@@ -48,7 +48,8 @@ def main():
         "new_conversation.wav": "New conversation.",
         "error.wav": "Error.",
         "tool_executing.wav": "Executing...",
-        "generating_response.wav": "Generating..."
+        "generating_response.wav": "Generating...",
+        "user_input_required.wav": "User input required"
     }
     
     # Create audio cache directory

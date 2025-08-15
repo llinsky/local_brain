@@ -8,7 +8,7 @@ import asyncio
 # Import all the tool functions
 from llm import (
     wikipedia_search, web_search, call_grok, call_openai, call_gemini, 
-    call_claude, call_consensus_query, call_superconsensus
+    call_claude, call_consensus_query, call_superconsensus, notify_human
 )
 from conversation_index import lookup_past_conversations
 from file_tools import read_file, write_file, list_directory, create_directory
@@ -58,6 +58,11 @@ class MCPServer:
                 "function": call_superconsensus,
                 "description": "Get superconsensus with cross-model selection",
                 "parameters": {"prompt": "string"}
+            },
+            "notify_human": {
+                "function": notify_human,
+                "description": "Play text sound notification when user input is required",
+                "parameters": {"message": "string"}
             },
             # "lookup_past_conversations": {
             #     "function": lookup_past_conversations,
@@ -160,6 +165,8 @@ class MCPServer:
                         tool_spec["inputSchema"]["properties"][param_name] = {"type": param_type}
                         if param_name in ["query", "prompt", "filepath", "code", "pattern"]:  # Required params
                             tool_spec["inputSchema"]["required"].append(param_name)
+                        elif param_name == "message" and name == "notify_human":  # Message is optional for notify_human
+                            pass  # Don't add to required
                     
                     tool_list.append(tool_spec)
 
@@ -202,6 +209,12 @@ class MCPServer:
                         }
                     }
                 except Exception as e:
+                    # Notify human for critical tool execution errors
+                    try:
+                        notify_human(f"Tool execution error for {tool_name}: {str(e)}")
+                    except Exception:
+                        pass  # Don't let notification errors break the MCP response
+                    
                     return {
                         "jsonrpc": "2.0",
                         "id": request_id,
