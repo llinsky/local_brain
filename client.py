@@ -117,7 +117,7 @@ def main():
                             try:
                                 cleanup_audio()
                                 stream.close()
-                                pa.terminate()
+                                # Don't call pa.terminate() - let Python's cleanup handle it
                             except Exception as e:
                                 print(f"Cleanup warning: {e}")
                             sys.exit(0)
@@ -147,7 +147,7 @@ def main():
                         stream.close()
                 except OSError:
                     pass  # Stream already closed
-            pa.terminate()
+            # Don't call pa.terminate() - let Python's cleanup handle it
         except Exception as e:
             print(f"Final cleanup warning: {e}")
 

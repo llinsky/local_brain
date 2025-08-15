@@ -108,13 +108,13 @@ def cleanup_audio():
         sd.stop()
         
         # Small delay to ensure SoundDevice cleanup completes
-        time.sleep(0.1)
+        time.sleep(0.05)  # Reduced delay
         
         _audio_cleaned_up = True
         print("Audio cleanup completed")
     except Exception as e:
-        print(f"Audio cleanup warning: {e}")
-        _audio_cleaned_up = True  # Mark as cleaned up even if there was an error
+        # Ignore cleanup errors - they're usually harmless during shutdown
+        _audio_cleaned_up = True
 
 def clean_text_for_speech(text: str) -> str:
     """Clean text for better TTS pronunciation by removing markdown formatting."""
