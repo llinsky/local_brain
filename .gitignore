@@ -1,0 +1,48 @@
+# API Keys and secrets
+keys/
+*.key
+
+# Personal conversation history
+conversations/
+conversation_index.json
+
+# Python virtual environment
+llm_venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Personal voice models and data
+data/*.onnx
+data/*.tflite
+data/*.wav
+
+# Audio cache (can be regenerated)
+audio_cache/
+
+# Temporary files
+temp_input.wav
+*.tmp
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Personal configurations
+custom_instructions.md

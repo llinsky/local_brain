@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "llm-client": {
+      "command": "python",
+      "args": ["./mcp_server.py"],
+      "description": "LLM Client MCP Server providing access to multiple LLMs, file operations, and system tools"
+    }
+  }
+}
