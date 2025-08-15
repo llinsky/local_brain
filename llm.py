@@ -809,9 +809,16 @@ def run_conversation(prompt: str, conversation_id: str = None):
     
     messages.append(message_dict)
 
-    # Check if the model wants to call tools
-    if hasattr(response.message, 'tool_calls') and response.message.tool_calls:
-        # Handle multiple tool calls in sequence
+    # Iterative tool execution with follow-up capability
+    max_iterations = 3
+    iteration = 0
+    all_tool_results = []
+    
+    while hasattr(response.message, 'tool_calls') and response.message.tool_calls and iteration < max_iterations:
+        iteration += 1
+        logger.info(f"Tool execution iteration {iteration}")
+        
+        # Handle tool calls in this iteration
         tool_results = []
         
         for tool_call in response.message.tool_calls:
@@ -896,42 +903,100 @@ def run_conversation(prompt: str, conversation_id: str = None):
                 "function": function_name,
                 "result": result
             })
+        
+        # Add this iteration's results to all results
+        all_tool_results.extend(tool_results)
+        
+        # Create intermediate prompt for follow-up decision
+        current_results = "\n\n".join([f"{tr['function']}: {tr['result']}" for tr in tool_results])
+        
+        if iteration < max_iterations:
+            # Ask LLM if it wants to make follow-up tool calls
+            followup_decision_prompt = f"""Based on these tool results:
+{current_results}
 
-        # Combine all tool results for the follow-up prompt
-        combined_results = "\n\n".join([f"{tr['function']}: {tr['result']}" for tr in tool_results])
-        followup_prompt = f"Based on the tool results:\n{combined_results}\n\nPlease provide a helpful response to the user's original question."
-        
-        # Add the tool execution info to conversation history
-        tool_call_summary = ", ".join([tr['function'] for tr in tool_results])
-        
-        # Convert tool calls to JSON-serializable format
-        serializable_tool_calls = []
-        for tc in response.message.tool_calls:
-            serializable_tool_calls.append({
-                'function': {
-                    'name': tc.function.name,
-                    'arguments': tc.function.arguments
-                }
+You can either:
+1. Make additional tool calls to gather more specific information (e.g., use get_web_page to fetch specific URLs from web_search results, or get_wikipedia_page for specific articles)
+2. Provide your final response to the user
+
+If you want to make additional tool calls, use the available tools. If you have enough information, provide your final answer to the user's question: {prompt}"""
+            
+            # Add tool execution to conversation history
+            tool_call_summary = ", ".join([tr['function'] for tr in tool_results])
+            serializable_tool_calls = []
+            for tc in response.message.tool_calls:
+                serializable_tool_calls.append({
+                    'function': {
+                        'name': tc.function.name,
+                        'arguments': tc.function.arguments
+                    }
+                })
+            
+            messages.append({
+                'role': 'assistant',
+                'content': f"I'll gather information using {tool_call_summary}.",
+                'tool_calls': serializable_tool_calls
             })
+            
+            messages.append({
+                'role': 'tool',
+                'content': current_results
+            })
+            
+            # Get LLM decision on follow-up
+            logger.info(f"Checking for follow-up tool calls (iteration {iteration})")
+            response = client.chat(
+                model='gpt-oss:20b',
+                messages=messages + [{'role': 'user', 'content': followup_decision_prompt}],
+                tools=tools,
+            )
+            
+            # Convert new response to serializable format
+            message_dict = {
+                'role': response.message.role,
+                'content': response.message.content
+            }
+            if hasattr(response.message, 'tool_calls') and response.message.tool_calls:
+                tool_calls = []
+                for tc in response.message.tool_calls:
+                    tool_call_dict = {
+                        'function': {
+                            'name': tc.function.name,
+                            'arguments': tc.function.arguments
+                        }
+                    }
+                    tool_calls.append(tool_call_dict)
+                message_dict['tool_calls'] = tool_calls
+            
+            messages.append(message_dict)
+        else:
+            # Max iterations reached, force final response
+            break
+    
+    # Prepare final response
+    if all_tool_results:
+        # Check if the last message from the assistant is already a final answer
+        last_message = messages[-1] if messages else None
+        if last_message and last_message['role'] == 'assistant' and not last_message.get('tool_calls'):
+            # The LLM has already provided a final answer
+            logger.info("Using existing final answer from last iteration")
+            print(last_message['content'])
+            
+            # Save the updated conversation
+            update_conversation(conversation_id, messages)
+            
+            return last_message['content'], conversation_id
         
-        messages.append({
-            'role': 'assistant',
-            'content': f"I'll gather information using {tool_call_summary}.",
-            'tool_calls': serializable_tool_calls
-        })
+        # Otherwise, generate a final response using all tool results
+        combined_results = "\n\n".join([f"{tr['function']}: {tr['result']}" for tr in all_tool_results])
+        final_prompt = f"Based on all the tool results:\n{combined_results}\n\nPlease provide a comprehensive response to the user's original question: {prompt}"
         
-        messages.append({
-            'role': 'tool',
-            'content': combined_results
-        })
-        
-        # Make a simple call with the follow-up prompt
-        logger.info("Generating final response based on tool result...")
+        logger.info("Generating final response based on all tool results...")
         final_response = client.chat(
             model='gpt-oss:20b', 
             messages=[
                 {'role': 'system', 'content': get_full_prompt("ollama")},
-                {'role': 'user', 'content': followup_prompt}
+                {'role': 'user', 'content': final_prompt}
             ]
         )
         logger.info("Final response generated")

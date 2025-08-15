@@ -92,26 +92,34 @@ response, conv_id = run_conversation("Search Wikipedia for Python programming")
 The system supports intelligent multi-step workflows where the LLM can:
 
 1. **Search then Explore**: Use search tools to get lists of results, then dive deep into specific items
-2. **Multiple Tool Chains**: Execute multiple tools in sequence during a single conversation turn
-3. **Context Building**: Build comprehensive responses by gathering information from multiple sources
+2. **Iterative Tool Execution**: Make informed follow-up tool calls based on previous results within a single turn
+3. **Multiple Tool Chains**: Execute multiple tools in sequence during a single conversation turn
+4. **Context Building**: Build comprehensive responses by gathering information from multiple sources
 
 ### Common Multi-Step Patterns
 
-**Wikipedia Research:**
+**Wikipedia Research (Iterative):**
 - `wikipedia_search("machine learning")` → Get list of related articles
+- *LLM evaluates results and decides to explore specific article*
 - `get_wikipedia_page("Deep learning")` → Get full content of specific article
 
-**Web Research:**
+**Web Research (Iterative):**
 - `web_search("climate change 2024")` → Get search results with URLs
+- *LLM evaluates results and selects most relevant URLs*
 - `get_web_page("https://example.com/climate-report")` → Fetch full article content
 
 **File System Exploration:**
 - `list_directory("/project/src")` → See available files
+- *LLM chooses relevant files to examine*
 - `read_file("/project/src/main.py")` → Read specific file content
 
 **Conversation Analysis:**
 - `lookup_past_conversations("database optimization")` → Find relevant conversations
+- *LLM selects most relevant conversation*
 - `load_full_conversation("conv_20240115_123")` → Load complete conversation history
+
+**How It Works:**
+The LLM can now see the results of initial tool calls and intelligently decide whether to make follow-up calls for deeper information. This happens automatically within a single conversation turn, with up to 3 iterations to prevent infinite loops.
 
 ## Available Tools
 
