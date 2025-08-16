@@ -12,7 +12,7 @@ A comprehensive voice-activated AI assistant that integrates multiple LLMs, tool
 - **Parallel conversations**: Support for multiple concurrent voice sessions
 
 ### 🤖 Multi-LLM Integration  
-- **Local Ollama**: Primary LLM with tool calling (gpt-oss:20b)
+- **Local Ollama**: Primary LLM with tool calling (Qwen3-30B, GPT-OSS-20B configurable)
 - **External APIs**: Gemini 2.5 Pro, GPT-5, Grok, Claude Sonnet
 - **Consensus queries**: Get responses from multiple models in parallel
 - **Superconsensus**: Advanced cross-model selection system
@@ -45,8 +45,9 @@ A comprehensive voice-activated AI assistant that integrates multiple LLMs, tool
 # Install dependencies
 pip install ollama pyaudio sounddevice numpy ddgs wikipedia anthropic openai google-generativeai nemo-toolkit piper-tts openwakeword
 
-# Ensure Ollama is running with gpt-oss:20b model
-ollama pull gpt-oss:20b
+# Ensure Ollama is running with required models
+ollama pull qwen3:30b
+ollama pull gpt-oss:20b  # Alternative local model
 ```
 
 ### API Keys Setup
@@ -221,8 +222,20 @@ For Claude Desktop, add to your Claude config:
 ### Audio Settings (`config.py`)
 ```python
 SAMPLE_RATE = 16000
-SILENCE_THRESHOLD = 200
-SILENCE_DURATION = 2.0
+SILENCE_THRESHOLD = 280
+SILENCE_DURATION = 4.25
+MINIMUM_RECORDING_TIME = 4.0
+```
+
+### Local Model Selection (`config.py`)
+```python
+# Choose your preferred local model
+DEFAULT_LOCAL_MODEL = "qwen3"  # Options: "qwen3", "gpt-oss"
+
+LOCAL_MODEL_OPTIONS = {
+    "gpt-oss": "gpt-oss:20b",
+    "qwen3": "qwen3:30b"
+}
 ```
 
 ### Custom Instructions (`custom_instructions.md`)
@@ -327,6 +340,7 @@ MIT License - see LICENSE file for details.
 - **Enhanced Logging**: Detailed processing flow visibility
 - **Faster Responses**: Optimized tool execution and response generation
 - **Graceful Shutdown**: Clean audio resource management on exit
+- **Qwen3-30B**: High-performance local model with advanced reasoning capabilities
 
 ### Audio Configuration
 Tunable parameters in `config.py`:

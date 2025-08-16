@@ -117,8 +117,11 @@ def cleanup_audio():
         _audio_cleaned_up = True
 
 def clean_text_for_speech(text: str) -> str:
-    """Clean text for better TTS pronunciation by removing markdown formatting."""
+    """Clean text for better TTS pronunciation by removing markdown formatting and thinking tags."""
     import re
+    
+    # Remove thinking tags from Qwen3 output first
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     
     # Remove markdown formatting
     # Remove bold/italic asterisks and underscores
