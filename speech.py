@@ -21,11 +21,7 @@ parakeet_model = nemo_asr.models.EncDecRNNTBPEModel.from_pretrained("nvidia/para
 
 from config import SILENCE_DURATION, SILENCE_THRESHOLD, SAMPLE_RATE, MINIMUM_RECORDING_TIME
 
-def handle_interrupt(sig, frame):
-    print("\n👋 Caught interrupt, exiting cleanly...")
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, handle_interrupt)
+# Note: SIGINT handling is done in client.py, not globally here
 
 def play_notification_beep(frequency=800, duration=0.2):
     """Play a short notification beep."""
@@ -71,6 +67,7 @@ def play_cached_audio(filename: str):
     if os.path.exists(cache_path):
         try:
             _is_speaking = True
+            
             # Load and play the cached WAV file
             with wave.open(cache_path, 'rb') as wav_file:
                 frames = wav_file.readframes(wav_file.getnframes())
@@ -79,8 +76,14 @@ def play_cached_audio(filename: str):
                 # Play the audio
                 sd.play(audio_data, wav_file.getframerate())
                 sd.wait()  # Wait until playback finishes
+                
                 _is_speaking = False
                 return True
+        except KeyboardInterrupt:
+            print("\nCached audio interrupted by Ctrl+C")
+            sd.stop()
+            _is_speaking = False
+            return True  # Still return True since we "played" (even if interrupted)
         except Exception as e:
             print(f"Error playing cached audio {filename}: {e}")
             _is_speaking = False
@@ -158,6 +161,7 @@ def is_speaking():
     """Check if TTS is currently playing."""
     return _is_speaking
 
+
 def speak(text: str):
     global _is_speaking
     # Clean text for better speech synthesis
@@ -175,6 +179,9 @@ def speak(text: str):
             # Convert audio bytes to numpy array and play
             audio_data = np.frombuffer(audio_chunk.audio_int16_bytes, dtype=np.int16)
             stream.write(audio_data)
+    except KeyboardInterrupt:
+        print("\nTTS interrupted by Ctrl+C")
+        # Don't re-raise - just stop TTS, continue program
     finally:
         stream.stop()
         stream.close()

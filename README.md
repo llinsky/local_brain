@@ -217,6 +217,12 @@ For Claude Desktop, add to your Claude config:
 - **"Execute Python: [code]"** - Run Python code
 - **"Read file [path]"** - Access file contents
 
+## Keyboard Controls
+
+- **Ctrl+C** - Interrupt/skip current TTS audio playback (conversation continues normally)
+  - First Ctrl+C: Stops only the TTS, conversation continues
+  - Second Ctrl+C: Exits the entire program
+
 ## Configuration
 
 ### Audio Settings (`config.py`)
@@ -334,6 +340,7 @@ MIT License - see LICENSE file for details.
 - **Pre-cached Audio**: Common system messages use pre-generated audio for instant playback
 - **Better Pronunciation**: Cleaned text processing for more natural speech
 - **Empty Command Filtering**: Ignores noise-triggered false commands
+- **TTS Interruption**: Press Ctrl+C to skip long audio responses
 
 ### Performance Optimizations
 - **Parallel Processing**: Multi-LLM consensus queries run simultaneously
