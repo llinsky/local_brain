@@ -15,6 +15,7 @@ from llm_instructions import get_full_prompt
 from file_tools import read_file, write_file, append_file, delete_file, list_directory, create_directory
 from system_tools import grep_files, find_files, head_file, tail_file, cat_file, wc_file
 from python_executor import execute_python_code, install_package, list_installed_packages
+from config import LOCAL_MODEL_OPTIONS, DEFAULT_LOCAL_MODEL
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,6 +30,25 @@ def get_ollama_client():
     if _ollama_client is None:
         _ollama_client = ollama.Client()
     return _ollama_client
+
+def get_local_model():
+    """Get the current local model string from config."""
+    return LOCAL_MODEL_OPTIONS.get(DEFAULT_LOCAL_MODEL, "gpt-oss:20b")
+
+def clean_thinking_text(text: str) -> str:
+    """Remove thinking tags from Qwen3 output."""
+    import re
+    if not text:
+        return text
+    
+    # Remove <think>...</think> blocks completely
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    
+    # Clean up extra whitespace left after removal
+    text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)  # Multiple newlines -> double newline
+    text = text.strip()
+    
+    return text
 
 def notify_human(message: str = "User input required"):
     """Play a notification sound and speak a message when user input is needed."""
@@ -314,59 +334,37 @@ def call_superconsensus(prompt: str):
     claude_1 = responses.get('claude_1', 'No response')
     claude_2 = responses.get('claude_2', 'No response')
 
+    super_selector_prompt = """
+    The following are 2 LLM responses for this prompt: <start_prompt>{prompt}</start_prompt>
+    
+    Response A: <response>{response_A}</response>
+    Response B: <response>{response_B}</response>
+    
+    Formulate and return only your own response to the prompt. However, use the best insights from 
+    Responses A and B combined your own analysis to think deeply about the best solution possible. 
+    """
 
-    # Execute response selection in parallel
-    def select_best_gemini():
-        gemini_selector_prompt = f"""
-        The following are 2 responses for this prompt: <start_prompt>{prompt}</start_prompt>
-        
-        Response A: <response>{gemini_1}</response>
-        Response B: <response>{gemini_2}</response>
-        
-        Choose A or B and briefly explain why. Then provide your own opinion on the topic.
+
+    # Execute response selection in parallel using unified select_best function
+    def select_best(response_A, response_B, judge_model_fn):
+        selector_prompt = f"""
+        The following are 2 LLM responses for this prompt: <start_prompt>{prompt}</start_prompt>
+
+        Response A: <response>{response_A}</response>
+        Response B: <response>{response_B}</response>
+
+        Formulate and return only your own response to the prompt. However, use the best insights from 
+        Responses A and B combined with your own analysis to think deeply about the best solution possible. 
         """
-        return call_openai(gemini_selector_prompt)
+        return judge_model_fn(selector_prompt)
     
-    def select_best_grok():
-        grok_selector_prompt = f"""
-        The following are 2 responses for this prompt: <start_prompt>{prompt}</start_prompt>
-        
-        Response A: <response>{grok_1}</response>
-        Response B: <response>{grok_2}</response>
-        
-        Choose A or B and briefly explain why. Then provide your own opinion on the topic.
-        """
-        return call_gemini(grok_selector_prompt)
-    
-    def select_best_gpt():
-        gpt_selector_prompt = f"""
-        The following are 2 responses for this prompt: <start_prompt>{prompt}</start_prompt>
-        
-        Response A: <response>{gpt_1}</response>
-        Response B: <response>{gpt_2}</response>
-        
-        Choose A or B and briefly explain why. Then provide your own opinion on the topic.
-        """
-        return call_grok(gpt_selector_prompt)
-    
-    def select_best_claude():
-        claude_selector_prompt = f"""
-        Choose the better response for this prompt: {prompt}
-        
-        Response A: {claude_1}
-        Response B: {claude_2}
-        
-        Choose A or B and briefly explain why. Then provide your own opinion on the topic.
-        """
-        return call_gemini(claude_selector_prompt)
-    
-    # Run all selections in parallel
+    # Run all selections in parallel using the unified select_best function
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
-            'best_gemini': executor.submit(select_best_gemini),
-            'best_grok': executor.submit(select_best_grok),
-            'best_gpt': executor.submit(select_best_gpt),
-            'best_claude': executor.submit(select_best_claude)
+            'best_gemini': executor.submit(select_best, gemini_1, gemini_2, call_openai),
+            'best_grok': executor.submit(select_best, grok_1, grok_2, call_gemini),
+            'best_gpt': executor.submit(select_best, gpt_1, gpt_2, call_grok),
+            'best_claude': executor.submit(select_best, claude_1, claude_2, call_gemini)
         }
         
         selection_results = {}
@@ -393,10 +391,33 @@ def call_superconsensus(prompt: str):
     
     Best Claude (selected by Claude): {best_claude}
     """
+
+    original_prompt_responses = f"""
+    Gemini 1: {gemini_1}
     
-    with open(f"/tmp/superconsensus_response_{int(time.time())}.txt", "w") as fp:
+    Gemini 2: {gemini_2}
+    
+    GPT-1: {gpt_1}
+    
+    GPT-2: {gpt_2}
+    
+    Grok 1: {grok_1}
+    
+    Grok 2: {grok_2}
+    
+    Claude 1: {claude_1}
+    
+    Claude 2: {claude_2}
+    """
+
+    output_file = f"/tmp/superconsensus_response_{int(time.time())}.txt"
+    with open(output_file, "w") as fp:
         fp.write(superconsensus_result)
-    
+
+    with open(output_file.replace("response", "thinking"), "w") as fp:
+        fp.write(original_prompt_responses)
+
+    print(f"Superconsensus response written to: {output_file}")
     return superconsensus_result
 
 
@@ -783,7 +804,7 @@ def run_conversation(prompt: str, conversation_id: str = None):
     logger.info("Sending request to Ollama LLM...")
     client = get_ollama_client()
     response = client.chat(
-        model='gpt-oss:20b',  # Or another model that supports function calling
+        model=get_local_model(),
         messages=messages,
         tools=tools,
     )
@@ -946,7 +967,7 @@ If you want to make additional tool calls, use the available tools. If you have 
             # Get LLM decision on follow-up
             logger.info(f"Checking for follow-up tool calls (iteration {iteration})")
             response = client.chat(
-                model='gpt-oss:20b',
+                model=get_local_model(),
                 messages=messages + [{'role': 'user', 'content': followup_decision_prompt}],
                 tools=tools,
             )
@@ -980,12 +1001,13 @@ If you want to make additional tool calls, use the available tools. If you have 
         if last_message and last_message['role'] == 'assistant' and not last_message.get('tool_calls'):
             # The LLM has already provided a final answer
             logger.info("Using existing final answer from last iteration")
-            print(last_message['content'])
+            cleaned_content = clean_thinking_text(last_message['content'])
+            print(cleaned_content)
             
             # Save the updated conversation
             update_conversation(conversation_id, messages)
             
-            return last_message['content'], conversation_id
+            return cleaned_content, conversation_id
         
         # Otherwise, generate a final response using all tool results
         combined_results = "\n\n".join([f"{tr['function']}: {tr['result']}" for tr in all_tool_results])
@@ -993,7 +1015,7 @@ If you want to make additional tool calls, use the available tools. If you have 
         
         logger.info("Generating final response based on all tool results...")
         final_response = client.chat(
-            model='gpt-oss:20b', 
+            model=get_local_model(), 
             messages=[
                 {'role': 'system', 'content': get_full_prompt("ollama")},
                 {'role': 'user', 'content': final_prompt}
@@ -1001,23 +1023,25 @@ If you want to make additional tool calls, use the available tools. If you have 
         )
         logger.info("Final response generated")
         
-        print(final_response.message.content)
+        cleaned_content = clean_thinking_text(final_response.message.content)
+        print(cleaned_content)
         
-        # Add final response to conversation history
+        # Add final response to conversation history (store cleaned version)
         final_message_dict = {
             'role': 'assistant',
-            'content': final_response.message.content
+            'content': cleaned_content
         }
         messages.append(final_message_dict)
         
         # Save the updated conversation
         update_conversation(conversation_id, messages)
         
-        return final_response.message.content, conversation_id
+        return cleaned_content, conversation_id
     else:
-        print(response.message.content)
+        cleaned_content = clean_thinking_text(response.message.content)
+        print(cleaned_content)
         
         # Save the conversation
         update_conversation(conversation_id, messages)
         
-        return response.message.content, conversation_id
+        return cleaned_content, conversation_id
