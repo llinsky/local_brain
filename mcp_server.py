@@ -29,26 +29,26 @@ class MCPServer:
                 "description": "Perform web search",
                 "parameters": {"query": "string"}
             },
-            "call_grok": {
-                "function": call_grok,
-                "description": "Call Grok model",
-                "parameters": {"prompt": "string"}
-            },
-            "call_openai": {
-                "function": call_openai,
-                "description": "Call OpenAI GPT-5",
-                "parameters": {"prompt": "string"}
-            },
-            "call_gemini": {
-                "function": call_gemini,
-                "description": "Call Google Gemini",
-                "parameters": {"prompt": "string"}
-            },
-            "call_claude": {
-                "function": call_claude,
-                "description": "Call Anthropic Claude",
-                "parameters": {"prompt": "string"}
-            },
+            # "call_grok": {
+            #     "function": call_grok,
+            #     "description": "Call Grok model",
+            #     "parameters": {"prompt": "string"}
+            # },
+            # "call_openai": {
+            #     "function": call_openai,
+            #     "description": "Call OpenAI GPT-5",
+            #     "parameters": {"prompt": "string"}
+            # },
+            # "call_gemini": {
+            #     "function": call_gemini,
+            #     "description": "Call Google Gemini",
+            #     "parameters": {"prompt": "string"}
+            # },
+            # "call_claude": {
+            #     "function": call_claude,
+            #     "description": "Call Anthropic Claude",
+            #     "parameters": {"prompt": "string"}
+            # },
             "call_consensus_query": {
                 "function": call_consensus_query,
                 "description": "Get consensus from multiple LLMs",
@@ -59,11 +59,11 @@ class MCPServer:
                 "description": "Get superconsensus with cross-model selection",
                 "parameters": {"prompt": "string"}
             },
-            "notify_human": {
-                "function": notify_human,
-                "description": "Play text sound notification when user input is required",
-                "parameters": {"message": "string"}
-            },
+            # "notify_human": {
+            #     "function": notify_human,
+            #     "description": "Play text sound notification when user input is required",
+            #     "parameters": {"message": "string"}
+            # },
             # "lookup_past_conversations": {
             #     "function": lookup_past_conversations,
             #     "description": "Search past conversations",
