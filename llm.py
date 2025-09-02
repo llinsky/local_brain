@@ -334,17 +334,6 @@ def call_superconsensus(prompt: str):
     claude_1 = responses.get('claude_1', 'No response')
     claude_2 = responses.get('claude_2', 'No response')
 
-    super_selector_prompt = """
-    The following are 2 LLM responses for this prompt: <start_prompt>{prompt}</start_prompt>
-    
-    Response A: <response>{response_A}</response>
-    Response B: <response>{response_B}</response>
-    
-    Formulate and return only your own response to the prompt. However, use the best insights from 
-    Responses A and B combined your own analysis to think deeply about the best solution possible. 
-    """
-
-
     # Execute response selection in parallel using unified select_best function
     def select_best(response_A, response_B, judge_model_fn):
         selector_prompt = f"""
@@ -353,8 +342,10 @@ def call_superconsensus(prompt: str):
         Response A: <response>{response_A}</response>
         Response B: <response>{response_B}</response>
 
-        Formulate and return only your own response to the prompt. However, use the best insights from 
-        Responses A and B combined with your own analysis to think deeply about the best solution possible. 
+        Formulate and return your own response to the prompt. However, use the best insights from 
+        Responses A and B combined with your own analysis to think deeply about the best solution possible. If
+        one response is clearly better and completely answers the prompt without changes, just return that
+        response. 
         """
         return judge_model_fn(selector_prompt)
     
