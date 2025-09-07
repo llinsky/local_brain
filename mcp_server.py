@@ -56,8 +56,8 @@ class MCPServer:
             },
             "call_superconsensus": {
                 "function": call_superconsensus,
-                "description": "Get superconsensus with cross-model selection. Create a prompt with as much relevant context as possible, including architecture overviews, full files, recent attempts/progress, error outputs, etc.",
-                "parameters": {"prompt": "string"}
+                "description": "Get superconsensus with cross-model selection. Create a prompt with as much relevant context as possible, including architecture overviews, full files, recent attempts/progress, error outputs, etc. Include an array of string file names for the models to access (full paths)",
+                "parameters": {"prompt": "string", "file_names": "array"}
             },
             # "notify_human": {
             #     "function": notify_human,
@@ -162,7 +162,14 @@ class MCPServer:
                     
                     # Build parameter schema
                     for param_name, param_type in info["parameters"].items():
-                        tool_spec["inputSchema"]["properties"][param_name] = {"type": param_type}
+                        if param_type == "array":
+                            tool_spec["inputSchema"]["properties"][param_name] = {
+                                "type": "array", 
+                                "items": {"type": "string"}
+                            }
+                        else:
+                            tool_spec["inputSchema"]["properties"][param_name] = {"type": param_type}
+                        
                         if param_name in ["query", "prompt", "filepath", "code", "pattern"]:  # Required params
                             tool_spec["inputSchema"]["required"].append(param_name)
                         elif param_name == "message" and name == "notify_human":  # Message is optional for notify_human

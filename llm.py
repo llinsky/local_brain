@@ -9,6 +9,7 @@ from timeout import Timeout
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import logging
+from typing import List
 from conversations import save_conversation, load_conversation, update_conversation, generate_conversation_id, clear_conversation_history, delete_conversation, list_conversations
 from conversation_index import lookup_past_conversations
 from llm_instructions import get_full_prompt
@@ -294,19 +295,34 @@ def call_consensus_query(prompt: str):
         fp.write(formatted_responses)
     return formatted_responses
 
-def call_superconsensus(prompt: str):
+def call_superconsensus(prompt: str, file_names: List[str] = None):
     """Calls 2 of each model in parallel and uses a different model to choose the best responses."""
     
-    # Define all model calls to execute in parallel
+    # Include file contents in prompt if file_names are provided
+    enhanced_prompt = prompt
+    if file_names:
+        file_contents = []
+        for file_name in file_names:
+            try:
+                with open(file_name, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    file_contents.append(f"\n--- File: {file_name} ---\n{content}\n--- End of {file_name} ---\n")
+            except Exception as e:
+                file_contents.append(f"\n--- File: {file_name} ---\nError reading file: {str(e)}\n--- End of {file_name} ---\n")
+        
+        if file_contents:
+            enhanced_prompt = f"{prompt}\n\nRelevant files:\n{''.join(file_contents)}"
+    
+    # Define all model calls to execute in parallel using enhanced_prompt
     model_calls = {
-        'gemini_1': lambda: call_gemini(prompt),
-        'gemini_2': lambda: call_gemini(prompt),
-        'gpt_1': lambda: call_openai(prompt),
-        'gpt_2': lambda: call_openai(prompt),
-        'grok_1': lambda: call_grok(prompt),
-        'grok_2': lambda: call_grok(prompt),
-        'claude_1': lambda: call_claude(prompt),
-        'claude_2': lambda: call_claude(prompt)
+        'gemini_1': lambda: call_gemini(enhanced_prompt),
+        'gemini_2': lambda: call_gemini(enhanced_prompt),
+        'gpt_1': lambda: call_openai(enhanced_prompt),
+        'gpt_2': lambda: call_openai(enhanced_prompt),
+        'grok_1': lambda: call_grok(enhanced_prompt),
+        'grok_2': lambda: call_grok(enhanced_prompt),
+        'claude_1': lambda: call_claude(enhanced_prompt),
+        'claude_2': lambda: call_claude(enhanced_prompt)
     }
     
     responses = {}
@@ -337,7 +353,7 @@ def call_superconsensus(prompt: str):
     # Execute response selection in parallel using unified select_best function
     def select_best(response_A, response_B, judge_model_fn):
         selector_prompt = f"""
-        The following are 2 LLM responses for this prompt: <start_prompt>{prompt}</start_prompt>
+        The following are 2 LLM responses for this prompt: <start_prompt>{enhanced_prompt}</start_prompt>
 
         Response A: <response>{response_A}</response>
         Response B: <response>{response_B}</response>
@@ -373,6 +389,7 @@ def call_superconsensus(prompt: str):
     
     superconsensus_result = f"""
     SUPERCONSENSUS for prompt: {prompt}
+    {f'Files included: {", ".join(file_names)}' if file_names else ''}
     
     Best Gemini (selected by GPT-5): {best_gemini}
     
@@ -595,6 +612,11 @@ tools = [
                     "prompt": {
                         "type": "string",
                         "description": "The prompt to send to all models for superconsensus.",
+                    },
+                    "file_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of file paths to include their full contents in the prompt.",
                     },
                 },
                 "required": ["prompt"],
