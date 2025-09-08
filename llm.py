@@ -243,7 +243,7 @@ def call_claude(prompt: str):
         
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=131072,
+            max_tokens=16384,
             system=system_prompt,
             messages=[{"role": "user", "content": prompt}]
         )
