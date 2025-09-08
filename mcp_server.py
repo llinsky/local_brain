@@ -51,12 +51,12 @@ class MCPServer:
             # },
             "call_consensus_query": {
                 "function": call_consensus_query,
-                "description": "Get consensus from multiple LLMs. Create a prompt with as much relevant context as possible, including architecture overviews, full files, recent attempts/progress, error outputs, etc.",
-                "parameters": {"prompt": "string"}
+                "description": "Get consensus from multiple LLMs. Create a prompt with as much relevant context as possible, including architecture overviews, full files, recent attempts/progress, error outputs, etc.  Include an array of string file names for the models to access (full paths), if relevant.",
+                "parameters": {"prompt": "string", "file_names": "array"}
             },
             "call_superconsensus": {
                 "function": call_superconsensus,
-                "description": "Get superconsensus with cross-model selection. Create a prompt with as much relevant context as possible, including architecture overviews, full files, recent attempts/progress, error outputs, etc. Include an array of string file names for the models to access (full paths)",
+                "description": "Get superconsensus with cross-model selection. Create a prompt with as much relevant context as possible, including architecture overviews, full files, recent attempts/progress, error outputs, etc. Include an array of string file names for the models to access (full paths), if relevant.",
                 "parameters": {"prompt": "string", "file_names": "array"}
             },
             # "notify_human": {

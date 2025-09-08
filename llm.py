@@ -252,15 +252,30 @@ def call_claude(prompt: str):
     except Exception as e:
         return json.dumps({"error": str(e)})
 
-def call_consensus_query(prompt: str):
+def call_consensus_query(prompt: str, file_names: List[str] = None):
     """Calls Gemini, Grok, GPT-5, and Claude in parallel and returns the response."""
+    
+    # Include file contents in prompt if file_names are provided
+    enhanced_prompt = prompt
+    if file_names:
+        file_contents = []
+        for file_name in file_names:
+            try:
+                with open(file_name, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    file_contents.append(f"\n--- File: {file_name} ---\n{content}\n--- End of {file_name} ---\n")
+            except Exception as e:
+                file_contents.append(f"\n--- File: {file_name} ---\nError reading file: {str(e)}\n--- End of {file_name} ---\n")
+        
+        if file_contents:
+            enhanced_prompt = f"{prompt}\n\nRelevant files:\n{''.join(file_contents)}"
     
     # Define the functions to call in parallel
     model_functions = {
-        'gemini': lambda: call_gemini(prompt),
-        'grok': lambda: call_grok(prompt), 
-        'gpt': lambda: call_openai(prompt),
-        'claude': lambda: call_claude(prompt)
+        'gemini': lambda: call_gemini(enhanced_prompt),
+        'grok': lambda: call_grok(enhanced_prompt), 
+        'gpt': lambda: call_openai(enhanced_prompt),
+        'claude': lambda: call_claude(enhanced_prompt)
     }
     
     responses = {}
@@ -595,6 +610,11 @@ tools = [
                     "prompt": {
                         "type": "string",
                         "description": "The prompt to send to the models.",
+                    },
+                    "file_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of file paths to include their full contents in the prompt.",
                     },
                 },
                 "required": ["prompt"],
