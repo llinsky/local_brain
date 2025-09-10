@@ -5,6 +5,7 @@ import wikipedia
 from ddgs import DDGS
 from openai import OpenAI
 import google.generativeai as genai
+import anthropic
 from timeout import Timeout
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -233,9 +234,7 @@ def call_gemini(prompt: str):
 def call_claude(prompt: str):
     """Calls the Claude API with the given prompt and returns the response."""
     try:
-        import anthropic
-        
-        with open("keys/claude_api.key", "r") as fp:
+        with open("keys/claude.key", "r") as fp:
             key = fp.readlines()[0].strip()
         
         client = anthropic.Anthropic(api_key=key)
