@@ -129,6 +129,7 @@ def load_full_conversation(conversation_id: str):
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+# TODO: compare my web search tools with the new ollama web_search and web_fetch tools
 def web_search(query: str, **kwargs):
     """Performs a web search for the given query and returns the top 10 results."""
     try:
@@ -234,19 +235,24 @@ def call_gemini(prompt: str):
 def call_claude(prompt: str):
     """Calls the Claude API with the given prompt and returns the response."""
     try:
+        import httpx
+
         with open("keys/claude.key", "r") as fp:
             key = fp.readlines()[0].strip()
-        
-        client = anthropic.Anthropic(api_key=key)
+
+        client = anthropic.Anthropic(
+            api_key=key,
+            timeout=httpx.Timeout(600.0, connect=60.0)
+        )
         system_prompt = get_full_prompt("claude")
-        
+
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16384,
+            model="claude-sonnet-4-5",
+            max_tokens=32768,
             system=system_prompt,
             messages=[{"role": "user", "content": prompt}]
         )
-        
+
         return json.dumps({"response": response.content[0].text})
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -305,8 +311,10 @@ def call_consensus_query(prompt: str, file_names: List[str] = None):
     Claude response: {responses.get('claude', 'No response')}
     
     """
-    with open(f"/tmp/call_consensus_query_response_{int(time.time())}.txt", "w") as fp:
+    output_file = f"/tmp/call_consensus_query_response_{int(time.time())}.txt"
+    with open(output_file, "w") as fp:
         fp.write(formatted_responses)
+    print(f"Consensus response written to output file: {output_file}")
     return formatted_responses
 
 def call_superconsensus(prompt: str, file_names: List[str] = None):
