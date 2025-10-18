@@ -9,7 +9,7 @@ FRAME_LENGTH = 1280  # 80ms at 16kHz for openWakeWord
 
 # Local LLM model configuration
 LOCAL_MODEL_OPTIONS = {
-    "gpt-oss": "gpt-oss:20b",
+    "gpt-oss": "gpt-oss:120b",
     "qwen3": "qwen3:30b"
 }
 

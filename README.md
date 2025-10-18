@@ -12,7 +12,7 @@ A comprehensive voice-activated AI assistant that integrates multiple LLMs, tool
 - **Parallel conversations**: Support for multiple concurrent voice sessions
 
 ### 🤖 Multi-LLM Integration  
-- **Local Ollama**: Primary LLM with tool calling (Qwen3-30B, GPT-OSS-20B configurable)
+- **Local Ollama**: Primary LLM with tool calling (Qwen3-30B, GPT-OSS-120B configurable)
 - **External APIs**: Gemini 2.5 Pro, GPT-5, Grok, Claude Sonnet
 - **Consensus queries**: Get responses from multiple models in parallel
 - **Superconsensus**: Advanced cross-model selection system
@@ -47,7 +47,7 @@ pip install ollama pyaudio sounddevice numpy ddgs wikipedia anthropic openai goo
 
 # Ensure Ollama is running with required models
 ollama pull qwen3:30b
-ollama pull gpt-oss:20b  # Alternative local model
+ollama pull gpt-oss:120b  # Alternative local model
 ```
 
 ### API Keys Setup
@@ -239,7 +239,7 @@ MINIMUM_RECORDING_TIME = 4.0
 DEFAULT_LOCAL_MODEL = "qwen3"  # Options: "qwen3", "gpt-oss"
 
 LOCAL_MODEL_OPTIONS = {
-    "gpt-oss": "gpt-oss:20b",
+    "gpt-oss": "gpt-oss:120b",
     "qwen3": "qwen3:30b"
 }
 ```
@@ -278,7 +278,7 @@ Add your own prompts and behaviors that apply to all LLM calls.
 └───────────┬───────────────────────┘
             │
 ┌─ Core LLM ────────────────────────┐
-│  Ollama (gpt-oss:20b)            │
+│  Ollama (gpt-oss:120b)            │
 │  + Tool Calling                   │  
 └───────────┬───────────────────────┘
             │
@@ -308,7 +308,7 @@ Add your own prompts and behaviors that apply to all LLM calls.
 ## Troubleshooting
 
 **No wake word detection**: Check microphone permissions and wake word model path
-**Empty responses**: Verify Ollama is running and gpt-oss:20b model is available
+**Empty responses**: Verify Ollama is running and gpt-oss:120b model is available
 **API errors**: Check API keys are valid and in correct `keys/` directory
 **File access denied**: Ensure paths are within allowed directories
 **Audio issues**: Check pyaudio/sounddevice installation and audio devices

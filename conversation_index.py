@@ -53,7 +53,7 @@ Summary:"""
     try:
         client = get_summary_ollama_client()
         response = client.chat(
-            model='gpt-oss:20b',
+            model='gpt-oss:120b',
             messages=[{'role': 'user', 'content': summary_prompt}]
         )
         return response['message']['content'].strip()

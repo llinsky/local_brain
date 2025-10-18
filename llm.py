@@ -35,7 +35,7 @@ def get_ollama_client():
 
 def get_local_model():
     """Get the current local model string from config."""
-    return LOCAL_MODEL_OPTIONS.get(DEFAULT_LOCAL_MODEL, "gpt-oss:20b")
+    return LOCAL_MODEL_OPTIONS.get(DEFAULT_LOCAL_MODEL, "gpt-oss:120b")
 
 def clean_thinking_text(text: str) -> str:
     """Remove thinking tags from Qwen3 output."""
